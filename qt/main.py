@@ -23,16 +23,35 @@ class Folder(File):
         super().__init__(path)
 
     def files(self):
-        return [self.make_file(name) for name in os.listdir(self.path__)]
+        def sort_by_name_root(names):
+            try:
+                name2order = {}
+                for name in names:
+                    name_root = os.path.splitext(name)[0]
+                    name2order[name] = int(name_root, 10)
+                return sorted(names, key=lambda x: name2order[x])
+            except ValueError:
+                # Failed to convert name_root into into
+                return None
+
+        names = os.listdir(self.path__)
+        names_ordered = sort_by_name_root(names) or names
+        return [self.make_file(name) for name in names_ordered]
 
     def make_file(self, name):
         path = os.path.join(self.path(), name)
         if os.path.isdir(path):
             return Folder(path)
-        return File(path)
+        else:
+            return File(path)
 
 
 class FolderWindow(PyQt5.QtWidgets.QWidget):
+    class Image():
+        def __init__(self, pixmap, file):
+            self.pixmap = pixmap
+            self.file = file
+
     def __init__(self, folder, parent=None):
         super().__init__(parent)
         self.folder = folder
@@ -56,10 +75,7 @@ class FolderWindow(PyQt5.QtWidgets.QWidget):
         for file in self.folder.files():
             pixmap = PyQt5.QtGui.QPixmap(file.path())
             if not pixmap.isNull():
-                self.image_list.append({
-                    'pixmap': pixmap,
-                    'file': file
-                })
+                self.image_list.append(FolderWindow.Image(pixmap, file))
 
         self.label = PyQt5.QtWidgets.QLabel(self)
         self.box.addWidget(self.label)
@@ -76,31 +92,23 @@ class FolderWindow(PyQt5.QtWidgets.QWidget):
             self.close()
 
     def show_image(self, image):
-        self.label.setPixmap(image['pixmap'])
-        self.setWindowTitle(image['file'].path())
+        self.label.setPixmap(image.pixmap)
+        self.setWindowTitle(image.file.path())
 
     def next_image(self, is_forward):
         length = len(self.image_list)
-
         if length == 0:
             self.next_btn.setEnabled(False)
             self.prev_btn.setEnabled(False)
             return
-        elif self.index is None:
+
+        if self.index is None:
             self.index = 0
-        elif is_forward:
-            if self.index == length - 1:
-                return
-            self.index += 1
         else:
-            # backward
-            if self.index == 0:
-                return
-            self.index -= 1
+            diff = 1 if is_forward else -1
+            self.index = (self.index + diff) % length
 
         self.show_image(self.image_list[self.index])
-        self.next_btn.setEnabled(self.index != length - 1)
-        self.prev_btn.setEnabled(self.index != 0)
 
 
 class MainWindow(PyQt5.QtWidgets.QWidget):
