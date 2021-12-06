@@ -52,6 +52,15 @@ class FolderWindow(PyQt5.QtWidgets.QWidget):
         self.next_btn.clicked.connect(lambda: self.next_image(True))
         hbox.addWidget(self.next_btn)
 
+        self.image_list = []
+        for file in self.folder.files():
+            pixmap = PyQt5.QtGui.QPixmap(file.path())
+            if not pixmap.isNull():
+                self.image_list.append({
+                    'pixmap': pixmap,
+                    'file': file
+                })
+
         self.label = PyQt5.QtWidgets.QLabel(self)
         self.box.addWidget(self.label)
         self.index = None
@@ -66,35 +75,32 @@ class FolderWindow(PyQt5.QtWidgets.QWidget):
         elif key == PyQt5.Qt.Qt.Key_Escape:
             self.close()
 
-    def show_image(self, file):
-        pixmap = PyQt5.QtGui.QPixmap(file.path())
-        if pixmap.isNull():
-            return False
-        self.label.setPixmap(pixmap)
-        self.setWindowTitle(file.path())
-        return True
+    def show_image(self, image):
+        self.label.setPixmap(image['pixmap'])
+        self.setWindowTitle(image['file'].path())
 
     def next_image(self, is_forward):
-        files = self.folder.files()
-        length = len(files)
-        indices = None
-        if self.index is None:
-            indices = range(0, length)
+        length = len(self.image_list)
+
+        if length == 0:
+            self.next_btn.setEnabled(False)
+            self.prev_btn.setEnabled(False)
+            return
+        elif self.index is None:
+            self.index = 0
         elif is_forward:
             if self.index == length - 1:
                 return
-            indices = range(self.index + 1, length)
+            self.index += 1
         else:
             # backward
             if self.index == 0:
                 return
-            indices = reversed(range(0, self.index))
-        for index in indices:
-            if self.show_image(files[index]):
-                self.index = index
-                self.next_btn.setEnabled(self.index != length - 1)
-                self.prev_btn.setEnabled(self.index != 0)
-                return
+            self.index -= 1
+
+        self.show_image(self.image_list[self.index])
+        self.next_btn.setEnabled(self.index != length - 1)
+        self.prev_btn.setEnabled(self.index != 0)
 
 
 class MainWindow(PyQt5.QtWidgets.QWidget):
