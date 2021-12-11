@@ -46,16 +46,14 @@ class Folder(File):
             return File(path)
 
 
-class FolderWindow(PyQt5.QtWidgets.QWidget):
+class Slideshow(PyQt5.QtWidgets.QWidget):
     class Image():
         def __init__(self, pixmap, file):
             self.pixmap = pixmap
             self.file = file
 
-    def __init__(self, folder, parent=None):
+    def __init__(self, files, parent=None):
         super().__init__(parent)
-        self.folder = folder
-
         self.setGeometry(300, 50, 400, 350)
         # Without setting the flags, the window is not shown...
         self.setWindowFlags(PyQt5.QtCore.Qt.Window)
@@ -72,10 +70,10 @@ class FolderWindow(PyQt5.QtWidgets.QWidget):
         hbox.addWidget(self.next_btn)
 
         self.image_list = []
-        for file in self.folder.files():
+        for file in files:
             pixmap = PyQt5.QtGui.QPixmap(file.path())
             if not pixmap.isNull():
-                self.image_list.append(FolderWindow.Image(pixmap, file))
+                self.image_list.append(Slideshow.Image(pixmap, file))
 
         self.label = PyQt5.QtWidgets.QLabel(self)
         self.box.addWidget(self.label)
@@ -118,9 +116,20 @@ class MainWindow(PyQt5.QtWidgets.QWidget):
         self.setGeometry(300, 50, 400, 350)
         self.setWindowTitle('mg')
 
+        self.box = PyQt5.QtWidgets.QVBoxLayout(self)
+
         self.btn = PyQt5.QtWidgets.QPushButton('Dialog', self)
-        self.btn.move(20, 20)
         self.btn.clicked.connect(self.show_dialog)
+        self.box.addWidget(self.btn)
+
+        self.slideshow_button = PyQt5.QtWidgets.QPushButton('Slideshow', self)
+        self.box.addWidget(self.slideshow_button)
+
+        self.folder_list_widget = PyQt5.QtWidgets.QListWidget(self)
+        self.box.addWidget(self.folder_list_widget)
+
+        self.image_list_widget = PyQt5.QtWidgets.QListWidget(self)
+        self.box.addWidget(self.image_list_widget)
 
         self.home_directory = os.path.expanduser('~')
 
@@ -132,13 +141,44 @@ class MainWindow(PyQt5.QtWidgets.QWidget):
     def show_dialog(self):
         path = PyQt5.QtWidgets.QFileDialog.getExistingDirectory(
             self, 'Open directory', self.home_directory)
-
         if path:
-            self.folder_window = FolderWindow(
-                folder=Folder(path),
-                parent=self)
-            self.folder_window.show()
+            self.show_folder(Folder(path))
 
+    def show_folder(self, folder):
+        child_folder_list = []
+        child_file_list = []
+        for child in folder.files():
+            if isinstance(child, Folder):
+                child_folder_list.append(child)
+            else:
+                child_file_list.append(child)
+
+        for folder in child_folder_list:
+            for file in folder.files():
+                pixmap = PyQt5.QtGui.QPixmap(file.path())
+                if not pixmap.isNull():
+                    icon = PyQt5.QtGui.QIcon(pixmap)
+                    text = os.path.basename(folder.path())
+                    item = PyQt5.QtWidgets.QListWidgetItem(icon, text)
+                    item.folder = folder
+                    self.folder_list_widget.addItem(item)
+                    break
+
+        self.folder_list_widget.itemClicked.connect(
+            lambda item: self.show_folder(item.folder))
+
+        for file in child_file_list:
+            pixmap = PyQt5.QtGui.QPixmap(file.path())
+            if not pixmap.isNull():
+                icon = PyQt5.QtGui.QIcon(pixmap)
+                text = os.path.basename(file.path())
+                item = PyQt5.QtWidgets.QListWidgetItem(icon, text)
+                self.image_list_widget.addItem(item)
+
+        if 0 < len(folder.files()):
+            self.slideshow_button.clicked.connect(
+                lambda: Slideshow(
+                    files=folder.files(), parent=self).show())
 
 def main():
     app = PyQt5.QtWidgets.QApplication(sys.argv)
